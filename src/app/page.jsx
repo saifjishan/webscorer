@@ -1,8 +1,6 @@
 "use client";
 import React, { useState, useCallback } from "react";
-import * as Recharts from "recharts";
 import { useHandleStreamResponse } from "../utilities/runtime-helpers";
-import Layout from '../components/Layout';
 
 export default function MainComponent() {
   const [query, setQuery] = useState("");
@@ -26,7 +24,8 @@ export default function MainComponent() {
     onFinish: handleFinish,
   });
 
-  const handleSearch = async () => {
+  const handleSearch = async (e) => {
+    e.preventDefault();
     setData([]); // Clear previous results
     const response = await fetch("/integrations/groq/", {
       method: "POST",
@@ -55,72 +54,41 @@ export default function MainComponent() {
     handleStreamResponse(response);
   };
 
-  const averageScore = data.length
-    ? Math.round(data.reduce((acc, curr) => acc + curr.value, 0) / data.length)
-    : 0;
-
   return (
-    <Layout>
-      <div className="max-w-4xl mx-auto p-4">
-        <div className="mb-8 flex gap-2">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+      <h1 className="text-4xl font-bold mb-8">WebScorer</h1>
+      <form onSubmit={handleSearch} className="w-full max-w-xl px-4">
+        <div className="flex gap-2">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="flex-1 p-3 rounded-lg border border-gray-300"
+            className="flex-1 p-4 rounded-full border border-gray-300 shadow-sm focus:outline-none focus:border-gray-400"
             placeholder="Enter website URL..."
           />
           <button
-            onClick={handleSearch}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+            type="submit"
+            className="px-8 py-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors duration-200 shadow-sm"
           >
             Analyze
           </button>
         </div>
+      </form>
 
-        {data.length > 0 && (
-          <div className="bg-white p-6 rounded-lg shadow-lg space-y-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold">
-                {averageScore}
-                <span className="text-gray-500 text-lg">/100</span>
-              </div>
-              <div className="text-gray-500">Overall Score</div>
+      {data.length > 0 && (
+        <div className="mt-8 w-full max-w-xl px-4">
+          {data.map((item, index) => (
+            <div key={index} className="flex justify-between items-center py-2 border-b">
+              <span className="text-gray-700">{item.name}</span>
+              <span className="font-semibold">{item.value}/100</span>
             </div>
-            <Recharts.ResponsiveContainer width="100%" height={300}>
-              <Recharts.RadarChart data={data}>
-                <Recharts.PolarGrid />
-                <Recharts.PolarAngleAxis dataKey="name" />
-                <Recharts.PolarRadiusAxis angle={30} domain={[0, 100]} />
-                <Recharts.Radar
-                  name="Score"
-                  dataKey="value"
-                  stroke="#3b82f6"
-                  fill="#3b82f6"
-                  fillOpacity={0.6}
-                />
-                <Recharts.Tooltip />
-              </Recharts.RadarChart>
-            </Recharts.ResponsiveContainer>
+          ))}
+        </div>
+      )}
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {data.map((item, index) => (
-                <div
-                  key={index}
-                  className="text-center p-4 bg-gray-50 rounded-lg"
-                >
-                  <div className="text-xl font-semibold">{item.value}</div>
-                  <div className="text-sm text-gray-500">{item.name}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {streamingMessage && (
-          <div className="mt-4 p-4 bg-gray-100 rounded">{streamingMessage}</div>
-        )}
-      </div>
-    </Layout>
+      {streamingMessage && (
+        <div className="mt-4 text-gray-600">{streamingMessage}</div>
+      )}
+    </div>
   );
 }
