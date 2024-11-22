@@ -1,30 +1,11 @@
 "use client";
-import React, { useState, useCallback } from "react";
-import { useHandleStreamResponse } from "../utilities/runtime-helpers";
+import React, { useState } from "react";
 
 export default function MainComponent() {
   const [query, setQuery] = useState("");
-  const [streamingMessage, setStreamingMessage] = useState("");
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const handleFinish = useCallback((message) => {
-    try {
-      const parsed = JSON.parse(message);
-      if (Array.isArray(parsed)) {
-        setData(parsed);
-      }
-    } catch (e) {
-      // not json data
-    }
-    setStreamingMessage("");
-    setLoading(false);
-  }, []);
-
-  const handleStreamResponse = useHandleStreamResponse({
-    onChunk: setStreamingMessage,
-    onFinish: handleFinish,
-  });
+  const [error, setError] = useState("");
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -32,6 +13,7 @@ export default function MainComponent() {
 
     setData([]); // Clear previous results
     setLoading(true);
+    setError("");
 
     try {
       // Ensure URL has protocol
@@ -40,39 +22,22 @@ export default function MainComponent() {
         urlToAnalyze = 'https://' + urlToAnalyze;
       }
 
-      const response = await fetch("/integrations/groq/", {
+      const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are an expert at analyzing websites. Analyze the provided URL for Performance, SEO, Accessibility, Best Practices, and Security. Consider factors like load time, mobile responsiveness, meta tags, HTTPS, and more. Provide realistic scores.",
-            },
-            {
-              role: "user",
-              content: `Analyze "${urlToAnalyze}" and generate website metrics in this exact JSON format: [
-                {"name": "Performance", "value": number between 0-100}, 
-                {"name": "SEO", "value": number between 0-100},
-                {"name": "Accessibility", "value": number between 0-100},
-                {"name": "Best Practices", "value": number between 0-100},
-                {"name": "Security", "value": number between 0-100}
-              ]. Only respond with the JSON.`,
-            },
-          ],
-          stream: true,
-        }),
+        body: JSON.stringify({ url: urlToAnalyze }),
       });
 
       if (!response.ok) {
         throw new Error('Failed to analyze website');
       }
 
-      handleStreamResponse(response);
+      const result = await response.json();
+      setData(result);
     } catch (error) {
       console.error('Error:', error);
-      setStreamingMessage('Failed to analyze website. Please try again.');
+      setError('Failed to analyze website. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
@@ -99,6 +64,10 @@ export default function MainComponent() {
         </div>
       </form>
 
+      {error && (
+        <div className="mt-4 text-red-600">{error}</div>
+      )}
+
       {data.length > 0 && (
         <div className="mt-8 w-full max-w-xl px-4">
           {data.map((item, index) => (
@@ -108,10 +77,6 @@ export default function MainComponent() {
             </div>
           ))}
         </div>
-      )}
-
-      {streamingMessage && (
-        <div className="mt-4 text-gray-600">{streamingMessage}</div>
       )}
     </div>
   );
