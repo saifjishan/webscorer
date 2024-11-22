@@ -6,6 +6,7 @@ export default function MainComponent() {
   const [query, setQuery] = useState("");
   const [streamingMessage, setStreamingMessage] = useState("");
   const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const handleFinish = useCallback((message) => {
     try {
@@ -17,6 +18,7 @@ export default function MainComponent() {
       // not json data
     }
     setStreamingMessage("");
+    setLoading(false);
   }, []);
 
   const handleStreamResponse = useHandleStreamResponse({
@@ -26,32 +28,53 @@ export default function MainComponent() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
+    if (!query.trim()) return;
+
     setData([]); // Clear previous results
-    const response = await fetch("/integrations/groq/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an expert at analyzing websites. Always provide balanced scores between 60-90 for each metric unless explicitly told otherwise. Ensure the scores are realistic and consistent.",
-          },
-          {
-            role: "user",
-            content: `Analyze "${query}" and generate website metrics in this exact JSON format: [
-              {"name": "Performance", "value": number between 0-100}, 
-              {"name": "SEO", "value": number between 0-100},
-              {"name": "Accessibility", "value": number between 0-100},
-              {"name": "Best Practices", "value": number between 0-100},
-              {"name": "Security", "value": number between 0-100}
-            ]. Only respond with the JSON.`,
-          },
-        ],
-        stream: true,
-      }),
-    });
-    handleStreamResponse(response);
+    setLoading(true);
+
+    try {
+      // Ensure URL has protocol
+      let urlToAnalyze = query;
+      if (!urlToAnalyze.startsWith('http://') && !urlToAnalyze.startsWith('https://')) {
+        urlToAnalyze = 'https://' + urlToAnalyze;
+      }
+
+      const response = await fetch("/integrations/groq/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an expert at analyzing websites. Analyze the provided URL for Performance, SEO, Accessibility, Best Practices, and Security. Consider factors like load time, mobile responsiveness, meta tags, HTTPS, and more. Provide realistic scores.",
+            },
+            {
+              role: "user",
+              content: `Analyze "${urlToAnalyze}" and generate website metrics in this exact JSON format: [
+                {"name": "Performance", "value": number between 0-100}, 
+                {"name": "SEO", "value": number between 0-100},
+                {"name": "Accessibility", "value": number between 0-100},
+                {"name": "Best Practices", "value": number between 0-100},
+                {"name": "Security", "value": number between 0-100}
+              ]. Only respond with the JSON.`,
+            },
+          ],
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to analyze website');
+      }
+
+      handleStreamResponse(response);
+    } catch (error) {
+      console.error('Error:', error);
+      setStreamingMessage('Failed to analyze website. Please try again.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -68,9 +91,10 @@ export default function MainComponent() {
           />
           <button
             type="submit"
-            className="px-8 py-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors duration-200 shadow-sm"
+            disabled={loading}
+            className="px-8 py-4 bg-black text-white rounded-full hover:bg-[#E80533] transition-colors duration-300 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Analyze
+            {loading ? 'Analyzing...' : 'Analyze'}
           </button>
         </div>
       </form>
