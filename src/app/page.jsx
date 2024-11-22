@@ -1,93 +1,36 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
-import * as Recharts from "recharts";
-import { useHandleStreamResponse } from "../utilities/runtime-helpers";
-import Layout from '../components/Layout'
-import { supabase } from '../utils/supabase'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
+import React, { useState, useEffect } from "react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import Layout from '../components/Layout';
+import { supabase } from '../utils/supabase';
 
-function MainComponent() {
-  const [query, setQuery] = useState("");
-  const [streamingMessage, setStreamingMessage] = useState("");
-  const [messages, setMessages] = useState([]);
-  const [data, setData] = useState([]);
-  const [scores, setScores] = useState([])
-  const [newScore, setNewScore] = useState({ score: '', category: '', notes: '' })
-  const [loading, setLoading] = useState(true)
+export default function MainComponent() {
+  const [scores, setScores] = useState([]);
+  const [newScore, setNewScore] = useState({ score: '', category: '', notes: '' });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-    console.log('Supabase Key exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+    getScores();
   }, []);
-
-  const handleFinish = useCallback((message) => {
-    setMessages((prev) => [...prev, { role: "assistant", content: message }]);
-    try {
-      const parsed = JSON.parse(message);
-      if (Array.isArray(parsed)) {
-        setData(parsed);
-      }
-    } catch (e) {
-      // not json data
-    }
-    setStreamingMessage("");
-  }, []);
-
-  const handleStreamResponse = useHandleStreamResponse({
-    onChunk: setStreamingMessage,
-    onFinish: handleFinish,
-  });
-
-  const handleSearch = async () => {
-    const response = await fetch("/integrations/groq/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an expert at analyzing websites. Always provide balanced scores between 60-90 for each metric unless explicitly told otherwise. Ensure the scores are realistic and consistent.",
-          },
-          {
-            role: "user",
-            content: `Analyze "${query}" and generate website metrics in this exact JSON format: [
-              {"name": "Performance", "value": number between 0-100}, 
-              {"name": "SEO", "value": number between 0-100},
-              {"name": "Accessibility", "value": number between 0-100},
-              {"name": "Best Practices", "value": number between 0-100},
-              {"name": "Security", "value": number between 0-100}
-            ]. Only respond with the JSON.`,
-          },
-        ],
-        stream: true,
-      }),
-    });
-    handleStreamResponse(response);
-  };
-
-  useEffect(() => {
-    getScores()
-  }, [])
 
   async function getScores() {
     try {
       const { data, error } = await supabase
         .from('scores')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false });
 
-      if (error) throw error
-      setScores(data || [])
+      if (error) throw error;
+      setScores(data || []);
     } catch (error) {
-      alert('Error fetching scores: ' + error.message)
+      alert('Error fetching scores: ' + error.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function addScore(e) {
-    e.preventDefault()
+    e.preventDefault();
     try {
       const { data, error } = await supabase
         .from('scores')
@@ -98,23 +41,19 @@ function MainComponent() {
             notes: newScore.notes,
           },
         ])
-        .select()
+        .select();
 
-      if (error) throw error
-      setScores([...scores, ...data])
-      setNewScore({ score: '', category: '', notes: '' })
+      if (error) throw error;
+      setScores([...scores, ...data]);
+      setNewScore({ score: '', category: '', notes: '' });
     } catch (error) {
-      alert('Error adding score: ' + error.message)
+      alert('Error adding score: ' + error.message);
     }
   }
 
-  const averageScore = data.length
-    ? Math.round(data.reduce((acc, curr) => acc + curr.value, 0) / data.length)
-    : 0;
-
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="space-y-8 p-4">
         {/* Score Input Form */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-4">Add New Score</h2>
@@ -163,19 +102,31 @@ function MainComponent() {
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-4">Score History</h2>
           <div className="w-full overflow-x-auto">
-            <LineChart
-              width={800}
-              height={400}
-              data={scores}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="created_at" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="score" stroke="#8884d8" />
-            </LineChart>
+            <div className="min-w-[800px] h-[400px]">
+              <LineChart
+                width={800}
+                height={400}
+                data={scores}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="created_at" 
+                  tickFormatter={(date) => new Date(date).toLocaleDateString()}
+                />
+                <YAxis />
+                <Tooltip 
+                  labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="score" 
+                  stroke="#8884d8" 
+                  name="Score"
+                />
+              </LineChart>
+            </div>
           </div>
         </div>
 
@@ -207,70 +158,7 @@ function MainComponent() {
             </table>
           </div>
         </div>
-
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-8 flex gap-2">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 p-3 rounded-full border border-gray-300"
-              placeholder="Enter website URL..."
-            />
-            <button
-              onClick={handleSearch}
-              className="px-6 py-2 bg-black text-white rounded-full hover:bg-[#E80533] transition-colors duration-200"
-            >
-              Analyze
-            </button>
-          </div>
-
-          {data.length > 0 && (
-            <div className="bg-white p-6 rounded-lg shadow-lg space-y-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold">
-                  {averageScore}
-                  <span className="text-gray-500 text-lg">/100</span>
-                </div>
-                <div className="text-gray-500">Overall Score</div>
-              </div>
-              <Recharts.ResponsiveContainer width="100%" height={300}>
-                <Recharts.RadarChart data={data}>
-                  <Recharts.PolarGrid />
-                  <Recharts.PolarAngleAxis dataKey="name" />
-                  <Recharts.PolarRadiusAxis angle={30} domain={[0, 100]} />
-                  <Recharts.Radar
-                    name="Score"
-                    dataKey="value"
-                    stroke="#3b82f6"
-                    fill="#3b82f6"
-                    fillOpacity={0.6}
-                  />
-                  <Recharts.Tooltip />
-                </Recharts.RadarChart>
-              </Recharts.ResponsiveContainer>
-
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {data.map((item, index) => (
-                  <div
-                    key={index}
-                    className="text-center p-4 bg-gray-50 rounded-lg"
-                  >
-                    <div className="text-xl font-semibold">{item.value}</div>
-                    <div className="text-sm text-gray-500">{item.name}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {streamingMessage && (
-            <div className="mt-4 p-4 bg-gray-100 rounded">{streamingMessage}</div>
-          )}
-        </div>
       </div>
     </Layout>
   );
 }
-
-export default MainComponent;
