@@ -15,6 +15,11 @@ function MainComponent() {
   const [newScore, setNewScore] = useState({ score: '', category: '', notes: '' })
   const [loading, setLoading] = useState(true)
 
+  useEffect(() => {
+    console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('Supabase Key exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  }, []);
+
   const handleFinish = useCallback((message) => {
     setMessages((prev) => [...prev, { role: "assistant", content: message }]);
     try {
